@@ -1,0 +1,54 @@
+class DoorHandler:
+
+    LocTokens = [
+        ['<door>', '<tp.door>'],
+        ['<key>', '<tp.key>'],
+        ['init', '<ini>'],
+        ['openable', '<opab>'],
+    ]
+
+    def LocalAnoncement(values, tokens_line, extokens):
+
+        type DoorType = Callable[[None], dict[str:int]]
+        Door: DoorType = lambda: {"values": [], "id": None, "idkey": None}
+
+        type KeyType = Callable[[None], dict[str:int]]
+        Key: KeyType = lambda: {"parent": None, "id": None}
+
+        if locwork.verifTokenQueue(tokens_line, 'cr', 'tp.door', 'word'):
+            _, value = locwork.getTokenValues(tokens_line[2])
+            values[value] = Door()
+        
+        elif locwork.verifTokenQueue(tokens_line, 'cr', 'tp.key', 'word'):
+            _, value = locwork.getTokenValues(tokens_line[2])
+            values[value] = Key()
+        
+        return extokens
+    
+    def TranslatedFunctions(tokens_line, excode, values):
+
+        def Format(string, *args):
+            for i, arg in enumerate(args): string = string.replace(f'${i}', str(arg))
+            return string
+
+        if locwork.verifTokenQueue(tokens_line, 'ini', 'tp.door', 'word'):
+            _, key = locwork.getTokenValues(tokens_line[2])
+            excode += Format('execute at @e[tag=$0] as @e[tag=$0] run setblock ~ ~-3 ~ air', values[key]["id"])  + '\n'
+            excode += Format('summon minecraft:interaction $1 $2 $3 {Tags:["$0"]}', values[key]["id"], values[key]["values"][0][0], values[key]["values"][0][1], values[key]["values"][0][2])
+        
+        elif locwork.verifTokenQueue(tokens_line, 'ini', 'tp.key', 'word', 'vc', 'int', 'int', 'int'):
+            _, key = locwork.getTokenValues(tokens_line[2])
+            _, x = locwork.getTokenValues(tokens_line[4])
+            _, y = locwork.getTokenValues(tokens_line[5])
+            _, z = locwork.getTokenValues(tokens_line[6])
+            excode += Format('summon minecraft:item_frame $2 $3 $4 {Item:{id:"$1",Count:1b,tag:{Tags:["$0"]}},Facing:1b,Invisible:1b}', values[key]["id"], values[key]["parent"], x, y, z)
+        
+        elif locwork.verifTokenQueue(tokens_line, 'opab', 'word'):
+            _, key = locwork.getTokenValues(tokens_line[1])
+            excode += Format('execute at @e[tag=$0] as @e[tag=$0] on target run execute if entity @p[nbt={SelectedItem:{tag:{Tags:["$1"]}}}] run setblock ~ ~-3 ~ minecraft:redstone_torch', values[key]["id"], values[key]["idkey"], values[key]["values"][0][0], values[key]["values"][0][1]-3, values[key]["values"][0][2]) + '\n'
+            excode += Format('execute at @e[tag=$0] as @e[tag=$0] on target run execute if entity @p[nbt={SelectedItem:{tag:{Tags:["$1"]}}}] run clear @p minecraft:tripwire_hook{Tags:["key"]} 1', values[key]["id"], values[key]["idkey"], values[key]["values"][0][0], values[key]["values"][0][1]-3, values[key]["values"][0][2]) + '\n'
+            excode += Format('execute at @e[tag=$0] as @e[tag=$0] on target run execute if block ~ ~-3 ~ minecraft:redstone_torch run kill @e[tag=$0]', values[key]["id"], values[key]["idkey"], values[key]["values"][0][0], values[key]["values"][0][1]-3, values[key]["values"][0][2]) + '\n'
+            excode += Format('execute at @e[tag=$0] as @e[tag=$0] on target run execute unless entity @p[nbt={SelectedItem:{tag:{Tags:["$1"]}}}] run title @p actionbar "Нужен ключ"', values[key]["id"], values[key]["idkey"], values[key]["values"][0][0], values[key]["values"][0][1]-3, values[key]["values"][0][2]) + '\n'
+            excode += Format('execute at @e[tag=$0] as @e[tag=$0] on target run execute unless entity @p[nbt={SelectedItem:{tag:{Tags:["$1"]}}}] run data remove entity @e[tag=$0,limit=1] interaction', values[key]["id"], values[key]["idkey"], values[key]["values"][0][0], values[key]["values"][0][1]-3, values[key]["values"][0][2])
+        
+        return excode
